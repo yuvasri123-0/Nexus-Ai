@@ -23,6 +23,12 @@ export default function App() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployedUrl, setDeployedUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  
+  // Agent Chat State
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLogs, setChatLogs] = useState([]);
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
 
   const domains = [
     { id: 'mern', name: 'MERN Stack', icon: <Layers className="w-5 h-5" /> },
@@ -94,6 +100,34 @@ export default function App() {
       alert('Failed to connect to the AI Agent Server (Make sure backend is running on port 5000)');
     }
     setIsGenerating(false);
+  };
+
+  const handleAgentChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+    
+    const newMessage = { role: 'user', content: chatInput };
+    setChatMessages(prev => [...prev, newMessage]);
+    setChatInput('');
+    setIsAgentTyping(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...chatMessages, newMessage] })
+      });
+      const data = await response.json();
+      
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      if (data.logs && data.logs.length > 0) {
+        setChatLogs(prev => [...prev, ...data.logs]);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Failed to connect to the Agent API." }]);
+    }
+    setIsAgentTyping(false);
   };
 
   const handleBuild = () => {
@@ -209,6 +243,13 @@ export default function App() {
           >
             <Plus className="w-5 h-5" />
             New Workspace
+          </button>
+          <button 
+            onClick={() => setView('agent')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${view === 'agent' ? 'bg-[#8b5cf6]/10 text-[#8b5cf6] font-medium border border-[#8b5cf6]/20' : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'}`}
+          >
+            <Terminal className="w-5 h-5" />
+            Agent Chat
           </button>
           <button 
             onClick={() => setView('settings')}
@@ -372,6 +413,94 @@ export default function App() {
                   <button className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors">
                     Delete Account
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* --- AGENT CHAT VIEW --- */}
+            {view === 'agent' && (
+              <div className="flex flex-col h-[80vh] bg-[#1e212b] rounded-2xl border border-[#2d313f] overflow-hidden animate-fade-in shadow-2xl">
+                {/* Header */}
+                <div className="p-4 border-b border-[#2d313f] bg-[#0f1117] flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#0ea5e9] flex items-center justify-center shadow-lg shadow-purple-500/20">
+                      <Bot className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">Autonomous Agent</h3>
+                      <p className="text-xs text-emerald-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Online & Ready</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Content Area: Split into Chat and Logs */}
+                <div className="flex-1 flex overflow-hidden">
+                  {/* Chat Section */}
+                  <div className="flex-1 flex flex-col border-r border-[#2d313f]">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      {chatMessages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-gray-500">
+                          <Bot className="w-16 h-16 text-[#2d313f]" />
+                          <p>I am your autonomous coding agent.<br/>I can run terminal commands, and read/write files in your workspace.<br/>What would you like me to do?</p>
+                        </div>
+                      )}
+                      {chatMessages.map((msg, i) => (
+                        <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          {msg.role === 'assistant' && (
+                            <div className="w-8 h-8 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center flex-shrink-0 mt-1">
+                              <Bot className="w-5 h-5 text-[#8b5cf6]" />
+                            </div>
+                          )}
+                          <div className={`max-w-[80%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-[#8b5cf6] text-white rounded-tr-sm' : 'bg-[#2d313f] text-gray-200 rounded-tl-sm'}`}>
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {isAgentTyping && (
+                        <div className="flex gap-4 justify-start animate-pulse">
+                          <div className="w-8 h-8 rounded-full bg-[#8b5cf6]/20 flex items-center justify-center flex-shrink-0 mt-1">
+                            <Bot className="w-5 h-5 text-[#8b5cf6]" />
+                          </div>
+                          <div className="bg-[#2d313f] text-gray-400 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Chat Input */}
+                    <div className="p-4 bg-[#0f1117] border-t border-[#2d313f]">
+                      <form onSubmit={handleAgentChat} className="flex gap-3">
+                        <input 
+                          type="text" 
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          placeholder="Ask me to build something or run a command..."
+                          className="flex-1 bg-[#1e212b] border border-[#2d313f] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#8b5cf6] transition-colors placeholder:text-gray-600"
+                        />
+                        <button type="submit" disabled={isAgentTyping || !chatInput.trim()} className="px-6 py-3 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl font-medium transition-colors disabled:opacity-50">
+                          Send
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Logs/Terminal Section */}
+                  <div className="w-80 bg-[#0f1117] flex flex-col relative">
+                    <div className="p-3 border-b border-[#2d313f] flex items-center gap-2 bg-[#1e212b]">
+                      <Terminal className="w-4 h-4 text-gray-400" />
+                      <span className="text-xs font-mono text-gray-400 uppercase">Agent Terminal</span>
+                    </div>
+                    <div className="flex-1 p-4 overflow-y-auto font-mono text-xs text-gray-400 space-y-2">
+                      {chatLogs.length === 0 && <span className="opacity-50">Waiting for commands...</span>}
+                      {chatLogs.map((log, i) => (
+                        <div key={i} className="break-words">
+                          <span className="text-[#8b5cf6]">➜</span> {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

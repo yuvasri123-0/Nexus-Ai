@@ -121,6 +121,133 @@ app.get('/api/download/:projectId', (req, res) => {
     archive.finalize();
 });
 
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+const fs = require('fs').promises;
+const path = require('path');
+
+// Sandbox directory for the agent to work in safely
+const WORKSPACE_DIR = path.join(__dirname, 'sandbox');
+require('fs').mkdirSync(WORKSPACE_DIR, { recursive: true });
+
+app.post('/api/chat', async (req, res) => {
+    const { messages } = req.body;
+    
+    if (!process.env.OPENAI_API_KEY) {
+        return res.json({ response: "Please add OPENAI_API_KEY to server/.env to enable the Autonomous Agent.", logs: ["[System] API Key missing."] });
+    }
+
+    try {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        
+        const tools = [
+            {
+                type: "function",
+                function: {
+                    name: "run_command",
+                    description: "Run a shell command in the workspace directory (e.g., npm install, mkdir, touch).",
+                    parameters: {
+                        type: "object",
+                        properties: { command: { type: "string" } },
+                        required: ["command"]
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "write_file",
+                    description: "Write content to a file in the workspace.",
+                    parameters: {
+                        type: "object",
+                        properties: { filename: { type: "string" }, content: { type: "string" } },
+                        required: ["filename", "content"]
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "read_file",
+                    description: "Read the content of a file in the workspace.",
+                    parameters: {
+                        type: "object",
+                        properties: { filename: { type: "string" } },
+                        required: ["filename"]
+                    }
+                }
+            }
+        ];
+
+        let currentMessages = [
+            { role: "system", content: "You are an autonomous AI coding agent like Antigravity. You can run commands, write files, and read files in a local sandbox directory to accomplish the user's tasks. After executing your tools, explain to the user what you just did." },
+            ...messages
+        ];
+
+        let maxIterations = 5;
+        let finalResponse = "";
+        let logs = [];
+
+        while (maxIterations > 0) {
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: currentMessages,
+                tools: tools,
+                tool_choice: "auto"
+            });
+
+            const message = response.choices[0].message;
+            currentMessages.push(message);
+
+            if (message.tool_calls) {
+                for (const toolCall of message.tool_calls) {
+                    const args = JSON.parse(toolCall.function.arguments);
+                    let result = "";
+                    
+                    try {
+                        if (toolCall.function.name === 'run_command') {
+                            logs.push(`$ ${args.command}`);
+                            const { stdout, stderr } = await execPromise(args.command, { cwd: WORKSPACE_DIR });
+                            result = stdout + (stderr ? "\\nError: " + stderr : "");
+                        } else if (toolCall.function.name === 'write_file') {
+                            logs.push(`[Writing file: ${args.filename}]`);
+                            await fs.writeFile(path.join(WORKSPACE_DIR, args.filename), args.content);
+                            result = `Successfully wrote ${args.filename}`;
+                        } else if (toolCall.function.name === 'read_file') {
+                            logs.push(`[Reading file: ${args.filename}]`);
+                            result = await fs.readFile(path.join(WORKSPACE_DIR, args.filename), 'utf-8');
+                        }
+                    } catch (e) {
+                        result = `Error executing tool: ${e.message}`;
+                        logs.push(`[Error: ${e.message}]`);
+                    }
+
+                    currentMessages.push({
+                        role: "tool",
+                        tool_call_id: toolCall.id,
+                        content: result.substring(0, 3000)
+                    });
+                }
+            } else {
+                finalResponse = message.content;
+                break;
+            }
+            maxIterations--;
+        }
+
+        if (maxIterations === 0 && !finalResponse) {
+            finalResponse = "Finished executing tasks. (Max iteration limit reached)";
+        }
+
+        res.json({ response: finalResponse, logs });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ response: "An error occurred in the agent loop.", logs: ["[Error] " + error.message] });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
