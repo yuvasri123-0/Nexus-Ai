@@ -22,6 +22,7 @@ export default function App() {
   const [buildStep, setBuildStep] = useState(0);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployedUrl, setDeployedUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const domains = [
     { id: 'mern', name: 'MERN Stack', icon: <Layers className="w-5 h-5" /> },
@@ -82,8 +83,12 @@ export default function App() {
         title: `Custom ${domains.find(d => d.id === domain)?.name}`,
         description: `An autonomous solution architected for your needs. Includes high performance APIs and scalable infrastructure.`,
         features: ['AI-optimized code', 'Secure Authentication', 'Scalable Microservices', 'Containerized Deployment'],
-        techStack: ['React', 'Node.js', 'PostgreSQL', 'Docker']
+        techStack: ['React', 'Node.js', 'PostgreSQL', 'Docker'],
+        files: data.files || {}
       });
+      if (data.files && Object.keys(data.files).length > 0) {
+        setSelectedFile(Object.keys(data.files)[0]);
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to connect to the AI Agent Server (Make sure backend is running on port 5000)');
@@ -534,6 +539,32 @@ export default function App() {
                                       </div>
                                     </div>
                                   </div>
+
+                                  {idea.files && Object.keys(idea.files).length > 0 && (
+                                    <div className="mt-8 border border-[#2d313f] rounded-xl overflow-hidden bg-[#0f1117] flex h-[500px]">
+                                      <div className="w-64 border-r border-[#2d313f] bg-[#1e212b] overflow-y-auto py-2">
+                                        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Generated Files</div>
+                                        {Object.keys(idea.files).map(filename => (
+                                          <button
+                                            key={filename}
+                                            onClick={() => setSelectedFile(filename)}
+                                            className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${selectedFile === filename ? 'bg-[#8b5cf6]/20 text-[#8b5cf6] border-r-2 border-[#8b5cf6]' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}
+                                          >
+                                            <Code className="w-4 h-4 flex-shrink-0" />
+                                            <span className="truncate">{filename}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="flex-1 overflow-y-auto bg-[#0f1117] p-4 relative">
+                                        {!selectedFile && <div className="absolute inset-0 flex items-center justify-center text-gray-500">Select a file to view code</div>}
+                                        {selectedFile && idea.files[selectedFile] && (
+                                          <pre className="text-sm font-mono text-gray-300 whitespace-pre-wrap break-all">
+                                            <code>{idea.files[selectedFile]}</code>
+                                          </pre>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                   
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <button 

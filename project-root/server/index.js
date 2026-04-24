@@ -93,7 +93,7 @@ app.post('/api/generate', async (req, res) => {
         // Keep in memory for 10 minutes, then clear
         setTimeout(() => { projects.delete(projectId); }, 10 * 60 * 1000);
         
-        res.json({ projectId, message: "Project generated successfully." });
+        res.json({ projectId, message: "Project generated successfully.", files });
 
     } catch (error) {
         console.error("Generation Error:", error);
