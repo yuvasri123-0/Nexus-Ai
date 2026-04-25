@@ -97,6 +97,15 @@ app.post('/api/generate', async (req, res) => {
 
     } catch (error) {
         console.error("Generation Error:", error);
+        if (error.message && error.message.includes('429')) {
+            const mockFiles = {
+                'README.md': `# Mock ${domain} Project\n\nThis is a mock project generated because of an OpenAI Quota error.\n\nRequirements: ${requirements}`,
+                'index.js': `console.log("Running mock ${domain} app...");`,
+                'package.json': JSON.stringify({ name: "mock-app", version: "1.0.0" }, null, 2)
+            };
+            projects.set(projectId, mockFiles);
+            return res.json({ projectId, message: "Project generated (Mock Fallback due to Quota).", files: mockFiles });
+        }
         res.status(500).json({ error: "Failed to generate project. If using OpenAI, check your API key." });
     }
 });

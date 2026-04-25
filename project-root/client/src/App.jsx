@@ -23,6 +23,8 @@ export default function App() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployedUrl, setDeployedUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [buildError, setBuildError] = useState(null);
+  const [isMockActive, setIsMockActive] = useState(false);
   
   // Agent Chat State
   const [chatMessages, setChatMessages] = useState([]);
@@ -69,20 +71,29 @@ export default function App() {
     setView('builder');
   };
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  
   const handleGenerate = async () => {
     if (!domain || !requirements.trim()) return;
     setIsGenerating(true);
     setIdea(null);
     setBuildStep(0);
     setDeployedUrl('');
+    setBuildError(null);
     
     try {
-      const response = await fetch('http://localhost:5000/api/generate', {
+      const response = await fetch(`${API_BASE_URL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ domain, requirements })
       });
       const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error?.message || 'Failed to generate project');
+      }
+      
+      setIsMockActive(data.isMock === true);
       
       setIdea({
         projectId: data.projectId,
@@ -97,7 +108,7 @@ export default function App() {
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to connect to the AI Agent Server (Make sure backend is running on port 5000)');
+      setBuildError(err.message);
     }
     setIsGenerating(false);
   };
@@ -112,20 +123,29 @@ export default function App() {
     setIsAgentTyping(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [...chatMessages, newMessage] })
       });
       const data = await response.json();
       
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-      if (data.logs && data.logs.length > 0) {
-        setChatLogs(prev => [...prev, ...data.logs]);
+      if (!response.ok || !data.success) {
+        setChatMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `⚠️ Error: ${data.error?.message || 'Agent failed to respond.'}`,
+          isError: true
+        }]);
+      } else {
+        setIsMockActive(data.isMock === true);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+        if (data.logs && data.logs.length > 0) {
+          setChatLogs(prev => [...prev, ...data.logs]);
+        }
       }
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: "Failed to connect to the Agent API." }]);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: "Unable to connect to the Agent API server.", isError: true }]);
     }
     setIsAgentTyping(false);
   };
@@ -152,7 +172,7 @@ export default function App() {
 
   const handleDownload = () => {
     if (!idea?.projectId) return;
-    window.location.href = `http://localhost:5000/api/download/${idea.projectId}`;
+    window.location.href = `${API_BASE_URL}/api/download/${idea.projectId}`;
   };
 
   const handleDeploy = () => {
@@ -291,6 +311,16 @@ export default function App() {
             </button>
           )}
         </header>
+
+        {/* Mock Mode Banner */}
+        {isMockActive && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-6 flex items-center justify-center gap-3 text-amber-500 animate-fade-in">
+            <Sparkles className="w-4 h-4" />
+            <p className="text-sm font-medium text-center">
+              Running in mock mode because OpenAI quota is unavailable.
+            </p>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 pb-24">
@@ -451,7 +481,11 @@ export default function App() {
                               <Bot className="w-5 h-5 text-[#8b5cf6]" />
                             </div>
                           )}
-                          <div className={`max-w-[80%] rounded-2xl p-4 ${msg.role === 'user' ? 'bg-[#8b5cf6] text-white rounded-tr-sm' : 'bg-[#2d313f] text-gray-200 rounded-tl-sm'}`}>
+                          <div className={`max-w-[80%] rounded-2xl p-4 ${
+                            msg.role === 'user' ? 'bg-[#8b5cf6] text-white rounded-tr-sm' : 
+                            msg.isError ? 'bg-red-500/10 border border-red-500/20 text-red-400 rounded-tl-sm' :
+                            'bg-[#2d313f] text-gray-200 rounded-tl-sm'
+                          }`}>
                             <p className="whitespace-pre-wrap">{msg.content}</p>
                           </div>
                         </div>
@@ -570,6 +604,17 @@ export default function App() {
                     )}
                   </button>
                 </div>
+
+                {/* Error Display */}
+                {buildError && (
+                  <div className="max-w-2xl mx-auto mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-3 animate-fade-in">
+                    <Terminal className="w-5 h-5" />
+                    <div>
+                      <p className="font-semibold text-sm">Architecture Failed</p>
+                      <p className="text-xs opacity-80">{buildError}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Generated Idea & Build Workflow */}
                 {idea && (
