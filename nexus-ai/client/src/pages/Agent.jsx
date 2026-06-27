@@ -28,7 +28,7 @@ const Agent = () => {
         setLoading(true);
 
         try {
-            const res = await axios.post('http://localhost:5000/api/ai/chat', { message: input });
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/ai/chat`, { message: input });
             setMessages(prev => [...prev, { role: 'assistant', text: res.data.response }]);
         } catch (err) {
             setMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I encountered an error communicating with the AI cluster. Please try again.' }]);

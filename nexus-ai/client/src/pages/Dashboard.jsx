@@ -14,7 +14,7 @@ const Dashboard = () => {
 
     const fetchProjects = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/projects');
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/projects`);
             setProjects(res.data);
         } catch (err) {
             console.error('Failed to fetch projects');
@@ -26,7 +26,7 @@ const Dashboard = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this project?')) return;
         try {
-            await axios.delete(`http://localhost:5000/api/projects/${id}`);
+            await axios.delete(`${import.meta.env.VITE_API_URL}/api/projects/${id}`);
             setProjects(projects.filter(p => p._id !== id));
         } catch (err) {
             alert('Failed to delete project');
@@ -35,7 +35,7 @@ const Dashboard = () => {
 
     const handleDownload = (id) => {
         const token = localStorage.getItem('token');
-        window.open(`http://localhost:5000/api/projects/${id}/download?token=${token}`, '_blank');
+        window.open(`${import.meta.env.VITE_API_URL}/api/projects/${id}/download?token=${token}`, '_blank');
     };
 
     const runningProjectsCount = projects.filter(p => p.status === 'running').length;

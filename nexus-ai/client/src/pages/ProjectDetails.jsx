@@ -17,7 +17,7 @@ const ProjectDetails = () => {
 
     const fetchProject = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/projects/${id}`);
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/projects/${id}`);
             setProject(res.data);
             if (res.data.files && res.data.files.length > 0) {
                 setSelectedFile(res.data.files[0]);
@@ -32,7 +32,7 @@ const ProjectDetails = () => {
 
     const handleDownload = () => {
         const token = localStorage.getItem('token');
-        window.open(`http://localhost:5000/api/projects/${id}/download?token=${token}`, '_blank');
+        window.open(`${import.meta.env.VITE_API_URL}/api/projects/${id}/download?token=${token}`, '_blank');
     };
 
     const handleCopy = () => {

@@ -16,7 +16,7 @@ const Settings = () => {
         setMessage({ text: '', type: '' });
 
         try {
-            const res = await axios.put('http://localhost:5000/api/auth/profile', { name, password });
+            const res = await axios.put(`${import.meta.env.VITE_API_URL}/api/auth/profile`, { name, password });
             setUser(res.data.user);
             setMessage({ text: 'Profile updated successfully!', type: 'success' });
             setPassword('');

@@ -32,7 +32,7 @@ const ProjectBuilder = () => {
             setTimeout(() => setBuildStatus('Building backend...'), 8000);
             setTimeout(() => setBuildStatus('Finalizing project...'), 10000);
 
-            const res = await axios.post('http://localhost:5000/api/ai/build', {
+            const res = await axios.post(`${import.meta.env.VITE_API_URL}/api/ai/build`, {
                 domain,
                 title,
                 requirements
